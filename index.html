@@ -158,51 +158,77 @@
             flex-grow: 1;
         }
         
-        /* LINE SELECTOR */
-        .line-selector-wrapper {
-            margin-bottom: 24px;
+        /* UPLOAD LOGO */
+        .upload-section {
+            margin-bottom: 20px;
         }
         
-        .line-selector {
-            display: flex;
-            gap: 0;
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .upload-btn {
+            width: 100%;
+            padding: 12px 14px;
             background: var(--bg-section);
-            border-radius: 9px;
-            padding: 2px;
             border: 1px solid var(--border-light);
-        }
-        
-        .line-selector button {
-            flex: 1;
-            padding: 8px 12px;
-            background: transparent;
-            border: none;
-            border-radius: 7px;
+            border-radius: 8px;
             font-size: 13px;
             font-weight: 500;
             color: var(--text-secondary);
             cursor: pointer;
+            text-align: center;
             transition: all 0.2s ease;
             letter-spacing: -0.01em;
         }
         
-        .line-selector button.active {
-            background: white;
+        .upload-btn:hover {
+            background: var(--slider-track);
+        }
+        
+        .upload-btn-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* LINE SETTINGS CARD */
+        .line-settings-card {
+            background: var(--bg-section);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .line-settings-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .line-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .line-settings-title {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
             color: var(--text-primary);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        [data-theme="dark"] .line-selector button.active {
-            background: var(--border-color);
-        }
-        
-        .line-selector button:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-        
-        .control-section {
-            margin-bottom: 24px;
         }
         
         .section-label {
@@ -212,10 +238,15 @@
             letter-spacing: 0.06em;
             color: var(--text-tertiary);
             margin-bottom: 12px;
+            margin-top: 16px;
+        }
+        
+        .section-label:first-child {
+            margin-top: 0;
         }
         
         .control-group { 
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         
         .control-group label { 
@@ -282,11 +313,14 @@
             display: flex; 
             align-items: center; 
             gap: 10px;
-            padding: 12px 14px;
-            background: var(--bg-section);
+            padding: 10px 12px;
+            background: white;
             border-radius: 8px;
-            margin-bottom: 20px;
             border: 1px solid var(--border-light);
+        }
+        
+        [data-theme="dark"] .checkbox-group {
+            background: var(--border-color);
         }
         
         .checkbox-group input[type="checkbox"] {
@@ -304,45 +338,11 @@
             letter-spacing: -0.01em;
         }
         
-        /* UPLOAD LOGO */
-        .upload-section {
-            margin-bottom: 20px;
-        }
-        
-        .upload-btn-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        .upload-btn {
-            width: 100%;
-            padding: 12px 14px;
-            background: var(--bg-section);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s ease;
-            letter-spacing: -0.01em;
-        }
-        
-        .upload-btn:hover {
-            background: var(--slider-track);
-        }
-        
-        .upload-btn-wrapper input[type=file] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-            width: 100%;
-            height: 100%;
+        /* LOGO SCALE */
+        .logo-scale-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-light);
         }
         
         /* ACTIONS */
@@ -446,10 +446,6 @@
                 padding: 24px;
             }
             
-            .control-section {
-                margin-bottom: 28px;
-            }
-            
             .actions {
                 padding: 24px;
             }
@@ -464,7 +460,7 @@
             <div class="panel-header">
                 <div class="panel-title-group">
                     <div class="panel-title">Générateur de Variations</div>
-                    <div class="panel-subtitle">Superposez vos lignes</div>
+                    <div class="panel-subtitle">Cliquez pour ajouter des lignes</div>
                 </div>
                 <button class="theme-toggle" id="themeToggle" aria-label="Changer le thème">
                     <span id="themeIcon">🌙</span>
@@ -480,22 +476,17 @@
                     </div>
                 </div>
                 
-                <div class="line-selector-wrapper">
-                    <div class="section-label">Ligne active</div>
-                    <div class="line-selector" id="lineSelector">
-                        <button data-line="0">Ligne 1</button>
-                        <button data-line="1">Ligne 2</button>
-                        <button data-line="2">Ligne 3</button>
-                        <button data-line="3">Ligne 4</button>
-                    </div>
-                </div>
-                
-                <div class="checkbox-group">
+                <div class="checkbox-group" style="margin-bottom: 20px;">
                     <input type="checkbox" id="animCheck">
                     <label for="animCheck">Animation</label>
                 </div>
+                
+                <div class="line-settings-card" id="lineSettingsCard">
+                    <div class="line-settings-header">
+                        <div class="line-color-dot" id="lineColorDot"></div>
+                        <div class="line-settings-title" id="lineSettingsTitle">Ligne 1</div>
+                    </div>
 
-                <div class="control-section">
                     <div class="section-label">Position</div>
                     <div class="control-group">
                         <label>Verticale <span class="control-value" id="vslider_val">0</span></label>
@@ -505,9 +496,7 @@
                         <label>Horizontale <span class="control-value" id="hslider_val">0</span></label>
                         <input type="range" id="hslider" min="-150" max="150" value="0">
                     </div>
-                </div>
 
-                <div class="control-section">
                     <div class="section-label">Forme</div>
                     <div class="control-group">
                         <label>Épaisseur <span class="control-value" id="tslider_val">10</span></label>
@@ -521,17 +510,19 @@
                         <label>Longueur <span class="control-value" id="lslider_val">1</span></label>
                         <input type="range" id="lslider" min="0.2" max="1" step="0.1" value="1">
                     </div>
-                </div>
 
-                <div class="control-section">
+                    <div class="section-label">Options</div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="lineInFrontToggle">
+                        <label for="lineInFrontToggle">Ligne devant le logo</label>
+                    </div>
+                </div>
+                
+                <div class="logo-scale-section">
                     <div class="section-label">Logo</div>
                     <div class="control-group">
                         <label>Échelle <span class="control-value" id="logoslider_val">1</span></label>
                         <input type="range" id="logoslider" min="0.5" max="2" step="0.1" value="1">
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="lineInFrontToggle">
-                        <label for="lineInFrontToggle">Ligne devant le logo</label>
                     </div>
                 </div>
             </div>
@@ -539,7 +530,7 @@
             <div class="actions">
                 <button class="primary-btn" id="genbtn">Générer Variations</button>
                 <button class="secondary-btn" id="exportGifBtn">Exporter 4 GIF</button>
-                <div class="info-text">Clic sur une case pour exporter le SVG</div>
+                <div class="info-text">Double-clic sur une case pour le SVG</div>
             </div>
         </div>
     </div>
