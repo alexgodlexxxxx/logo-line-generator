@@ -4,12 +4,15 @@ let logoImg = null;
 let isAnimating = false;
 let canvasWidth, canvasHeight;
 
-// Structure des lignes : 4 lignes indépendantes
-let lines = [
-    { vOffset: 0, hOffset: 0, thickness: 10, freq: 3, length: 1, inFront: false, color: null, offset: 0, speed: 0 },
-    { vOffset: 0, hOffset: 0, thickness: 10, freq: 3, length: 1, inFront: false, color: null, offset: 0, speed: 0 },
-    { vOffset: 0, hOffset: 0, thickness: 10, freq: 3, length: 1, inFront: false, color: null, offset: 0, speed: 0 },
-    { vOffset: 0, hOffset: 0, thickness: 10, freq: 3, length: 1, inFront: false, color: null, offset: 0, speed: 0 }
+// Structure des lignes
+let lines = [];
+
+// Structure des cases : chaque case a une liste d'indices de lignes
+let cellLines = [
+    [0], // Case 1 : Ligne 1 uniquement
+    [0], // Case 2 : Ligne 1 au départ
+    [0], // Case 3 : Ligne 1 au départ
+    [0]  // Case 4 : Ligne 1 au départ
 ];
 
 let logoScale = 1;
@@ -20,7 +23,6 @@ let isRecording = false;
 let recordingCell = 0;
 let recordingFrames = 0;
 let maxRecordingFrames = 120;
-let allCapturers = [];
 
 function setup() {
     calculateCanvasSize();
@@ -38,9 +40,8 @@ function setup() {
     setupInterface();
     setupThemeToggle();
     setupLogoUpload();
-    setupLineSelector();
     setupGifExport();
-    updateLineSelector();
+    updateLineDisplay();
 }
 
 function calculateCanvasSize() {
@@ -67,11 +68,25 @@ function windowResized() {
 }
 
 function initializeLines() {
+    lines = [];
+    // Créer 4 lignes au démarrage
     for (let i = 0; i < 4; i++) {
-        lines[i].color = random(palette);
-        lines[i].offset = random(1000);
-        lines[i].speed = random(0.02, 0.05) * (random() > 0.5 ? 1 : -1);
+        lines.push(createNewLine());
     }
+}
+
+function createNewLine() {
+    return {
+        vOffset: 0,
+        hOffset: 0,
+        thickness: 10,
+        freq: 3,
+        length: 1,
+        inFront: false,
+        color: random(palette),
+        offset: random(1000),
+        speed: random(0.02, 0.05) * (random() > 0.5 ? 1 : -1)
+    };
 }
 
 function setupThemeToggle() {
@@ -108,24 +123,15 @@ function setupLogoUpload() {
     };
 }
 
-function setupLineSelector() {
-    const buttons = document.querySelectorAll('.line-selector button');
-    buttons.forEach((btn, idx) => {
-        btn.onclick = () => {
-            activeLine = idx;
-            updateLineSelector();
-            loadLineSettings();
-        };
-    });
-}
-
-function updateLineSelector() {
-    const buttons = document.querySelectorAll('.line-selector button');
-    buttons.forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === activeLine);
-        // Désactive les lignes non disponibles selon la case sélectionnée
-        btn.disabled = idx > selectedCell;
-    });
+function updateLineDisplay() {
+    const line = lines[activeLine];
+    
+    // Mettre à jour le titre et la couleur
+    document.getElementById('lineSettingsTitle').textContent = `Ligne ${activeLine + 1}`;
+    document.getElementById('lineColorDot').style.backgroundColor = line.color;
+    
+    // Charger les valeurs
+    loadLineSettings();
 }
 
 function loadLineSettings() {
@@ -165,7 +171,6 @@ function startAllGifRecording() {
     isRecording = true;
     recordingCell = 0;
     recordingFrames = 0;
-    allCapturers = [];
     
     startCellRecording(0);
 }
@@ -206,7 +211,7 @@ function setupInterface() {
 
     document.getElementById('genbtn').onclick = () => {
         initializeLines();
-        loadLineSettings();
+        updateLineDisplay();
     };
     
     document.getElementById('animCheck').onchange = (e) => {
@@ -222,6 +227,7 @@ function regenerateLine(lineIndex) {
     lines[lineIndex].color = random(palette);
     lines[lineIndex].offset = random(1000);
     lines[lineIndex].speed = random(0.02, 0.05) * (random() > 0.5 ? 1 : -1);
+    updateLineDisplay();
 }
 
 function draw() {
@@ -245,18 +251,18 @@ function draw() {
             noFill();
             rect(x, y, cellW, cellH);
             
-            // Nombre de lignes selon la case
-            let numLines = cellIndex + 1;
+            // Récupérer les lignes de cette case
+            let currentCellLines = cellLines[cellIndex];
             
             // Lignes derrière le logo
-            for (let k = 0; k < numLines; k++) {
-                if (!lines[k].inFront) {
+            currentCellLines.forEach(lineIdx => {
+                if (!lines[lineIdx].inFront) {
                     let pg = createGraphics(cellW, cellH);
-                    drawLine(pg, cellW, cellH, lines[k], t);
+                    drawLine(pg, cellW, cellH, lines[lineIdx], t);
                     image(pg, x, y);
                     pg.remove();
                 }
-            }
+            });
             
             // Logo
             if (logoImg) {
@@ -267,21 +273,20 @@ function draw() {
             }
             
             // Lignes devant le logo
-            for (let k = 0; k < numLines; k++) {
-                if (lines[k].inFront) {
+            currentCellLines.forEach(lineIdx => {
+                if (lines[lineIdx].inFront) {
                     let pg = createGraphics(cellW, cellH);
-                    drawLine(pg, cellW, cellH, lines[k], t);
+                    drawLine(pg, cellW, cellH, lines[lineIdx], t);
                     image(pg, x, y);
                     pg.remove();
                 }
-            }
+            });
         }
     }
     
     // Gestion enregistrement GIF
     if (isRecording && capturer) {
         if (recordingFrames < maxRecordingFrames) {
-            // Capturer seulement la cellule en cours d'enregistrement
             let tempCanvas = createGraphics(cellW, cellH);
             let col = recordingCell % cols;
             let row = floor(recordingCell / cols);
@@ -290,15 +295,12 @@ function draw() {
             tempCanvas.remove();
             recordingFrames++;
         } else {
-            // Finir cette cellule et passer à la suivante
             capturer.stop();
             capturer.save();
-            allCapturers.push(capturer);
             
             if (recordingCell < 3) {
                 setTimeout(() => startCellRecording(recordingCell + 1), 500);
             } else {
-                // Tout est fini
                 isRecording = false;
                 const btn = document.getElementById('exportGifBtn');
                 btn.disabled = false;
@@ -339,17 +341,26 @@ function handleCanvasClick() {
     
     if (col >= 0 && col < cols && row >= 0 && row < rows) {
         let cellIndex = col + row * cols;
-        selectedCell = cellIndex;
         
-        // Limiter la ligne active selon la case sélectionnée
-        if (activeLine > selectedCell) {
-            activeLine = selectedCell;
+        // Si simple clic sur une case différente
+        if (cellIndex !== selectedCell) {
+            selectedCell = cellIndex;
+            
+            // Ajouter une ligne si nécessaire
+            if (cellIndex > 0 && cellLines[cellIndex].length <= cellIndex) {
+                let newLineIndex = cellIndex;
+                if (!cellLines[cellIndex].includes(newLineIndex)) {
+                    cellLines[cellIndex].push(newLineIndex);
+                }
+            }
+            
+            // Basculer sur la dernière ligne de cette case
+            let lastLineIdx = cellLines[cellIndex][cellLines[cellIndex].length - 1];
+            activeLine = lastLineIdx;
+            updateLineDisplay();
         }
         
-        updateLineSelector();
-        loadLineSettings();
-        
-        // Export SVG au double-clic
+        // Double-clic = export SVG
         if (event.detail === 2) {
             exportCellAsSVG(cellIndex);
         }
@@ -359,7 +370,7 @@ function handleCanvasClick() {
 function exportCellAsSVG(cellIndex) {
     let col = cellIndex % cols;
     let row = floor(cellIndex / cols);
-    let numLines = cellIndex + 1;
+    let currentCellLines = cellLines[cellIndex];
     
     let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${cellW}" height="${cellH}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -367,11 +378,11 @@ function exportCellAsSVG(cellIndex) {
 `;
 
     // Lignes derrière
-    for (let k = 0; k < numLines; k++) {
-        if (!lines[k].inFront) {
-            svgContent += generateLineSVG(cellW, cellH, lines[k]);
+    currentCellLines.forEach(lineIdx => {
+        if (!lines[lineIdx].inFront) {
+            svgContent += generateLineSVG(cellW, cellH, lines[lineIdx]);
         }
-    }
+    });
     
     // Logo
     if (logoImg && logoImg.canvas && logoImg.canvas.toDataURL) {
@@ -384,11 +395,11 @@ function exportCellAsSVG(cellIndex) {
     }
     
     // Lignes devant
-    for (let k = 0; k < numLines; k++) {
-        if (lines[k].inFront) {
-            svgContent += generateLineSVG(cellW, cellH, lines[k]);
+    currentCellLines.forEach(lineIdx => {
+        if (lines[lineIdx].inFront) {
+            svgContent += generateLineSVG(cellW, cellH, lines[lineIdx]);
         }
-    }
+    });
     
     svgContent += `</svg>`;
     
