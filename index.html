@@ -28,6 +28,8 @@
             --slider-track: #d1d1d6;
             --slider-thumb: #000000;
             --selection-border: #007aff;
+            --toggle-off: #e5e5e5;
+            --toggle-on: #34c759;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
         }
@@ -47,6 +49,8 @@
             --slider-track: #48484a;
             --slider-thumb: #ffffff;
             --selection-border: #0a84ff;
+            --toggle-off: #48484a;
+            --toggle-on: #32d74b;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
             --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
         }
@@ -199,6 +203,119 @@
             height: 100%;
         }
         
+        /* TOGGLE iOS STYLE */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: var(--bg-section);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-light);
+        }
+        
+        .toggle-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: -0.01em;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 51px;
+            height: 31px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--toggle-off);
+            transition: .3s;
+            border-radius: 31px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 27px;
+            width: 27px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--toggle-on);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        
+        /* LINE TABS (segmented control) */
+        .line-tabs-wrapper {
+            margin-bottom: 20px;
+        }
+        
+        .line-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            background: var(--bg-section);
+            border-radius: 9px;
+            padding: 2px;
+            border: 1px solid var(--border-light);
+        }
+        
+        .line-tab {
+            padding: 8px 8px;
+            background: transparent;
+            border: none;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .line-tab .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .line-tab.active {
+            background: white;
+            color: var(--text-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        [data-theme="dark"] .line-tab.active {
+            background: var(--border-color);
+        }
+        
         /* LINE SETTINGS CARD */
         .line-settings-card {
             background: var(--bg-section);
@@ -206,29 +323,6 @@
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 20px;
-        }
-        
-        .line-settings-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border-light);
-        }
-        
-        .line-color-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        
-        .line-settings-title {
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-            color: var(--text-primary);
         }
         
         .section-label {
@@ -306,36 +400,6 @@
             cursor: pointer;
             border: none;
             box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-        }
-        
-        /* CHECKBOX */
-        .checkbox-group { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px;
-            padding: 10px 12px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid var(--border-light);
-        }
-        
-        [data-theme="dark"] .checkbox-group {
-            background: var(--border-color);
-        }
-        
-        .checkbox-group input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-        
-        .checkbox-group label {
-            font-size: 13px; 
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            user-select: none;
-            letter-spacing: -0.01em;
         }
         
         /* LOGO SCALE */
@@ -476,17 +540,37 @@
                     </div>
                 </div>
                 
-                <div class="checkbox-group" style="margin-bottom: 20px;">
-                    <input type="checkbox" id="animCheck">
-                    <label for="animCheck">Animation</label>
+                <div class="toggle-row">
+                    <span class="toggle-label">Animation</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="animCheck">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
                 
-                <div class="line-settings-card" id="lineSettingsCard">
-                    <div class="line-settings-header">
-                        <div class="line-color-dot" id="lineColorDot"></div>
-                        <div class="line-settings-title" id="lineSettingsTitle">Ligne 1</div>
+                <div class="line-tabs-wrapper">
+                    <div class="section-label">Ligne active</div>
+                    <div class="line-tabs" id="lineTabs">
+                        <button class="line-tab active" data-line="0">
+                            <span class="color-dot" id="dot0"></span>
+                            <span>L1</span>
+                        </button>
+                        <button class="line-tab" data-line="1">
+                            <span class="color-dot" id="dot1"></span>
+                            <span>L2</span>
+                        </button>
+                        <button class="line-tab" data-line="2">
+                            <span class="color-dot" id="dot2"></span>
+                            <span>L3</span>
+                        </button>
+                        <button class="line-tab" data-line="3">
+                            <span class="color-dot" id="dot3"></span>
+                            <span>L4</span>
+                        </button>
                     </div>
-
+                </div>
+                
+                <div class="line-settings-card">
                     <div class="section-label">Position</div>
                     <div class="control-group">
                         <label>Verticale <span class="control-value" id="vslider_val">0</span></label>
@@ -510,11 +594,14 @@
                         <label>Longueur <span class="control-value" id="lslider_val">1</span></label>
                         <input type="range" id="lslider" min="0.2" max="1" step="0.1" value="1">
                     </div>
-
+                    
                     <div class="section-label">Options</div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="lineInFrontToggle">
-                        <label for="lineInFrontToggle">Ligne devant le logo</label>
+                    <div class="toggle-row">
+                        <span class="toggle-label">Ligne devant le logo</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="lineInFrontToggle">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                 </div>
                 
