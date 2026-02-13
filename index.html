@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur de Variations</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
     <style>
         * { 
             margin: 0; 
@@ -329,6 +330,31 @@
             transform: translateY(0);
         }
         
+        button.secondary-btn {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            transition: all 0.2s ease;
+            background: var(--bg-section);
+            color: var(--text-primary);
+        }
+
+        button.secondary-btn:hover {
+            background: var(--slider-track);
+            border-color: var(--accent);
+        }
+
+        button.secondary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         .info-text { 
             font-size: 11px; 
             color: var(--text-subtle); 
@@ -385,7 +411,7 @@
                 padding: 24px;
             }
             
-            button.primary-btn {
+            button.primary-btn, button.secondary-btn {
                 padding: 16px;
             }
             
@@ -421,7 +447,19 @@
                 
                 <div class="checkbox-group">
                     <input type="checkbox" id="animCheck">
-                    <label for="animCheck">Animation serpent 🐍</label>
+                    <label for="animCheck">Activer animation</label>
+                </div>
+
+                <div class="control-section">
+                    <div class="section-label">Lignes Supplémentaires</div>
+                    <div class="control-group">
+                        <label>Nombre de lignes <span class="control-value" id="extraLinesSlider_val">0</span></label>
+                        <input type="range" id="extraLinesSlider" min="0" max="5" value="0">
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="linesPositionToggle">
+                        <label for="linesPositionToggle">Lignes devant le logo</label>
+                    </div>
                 </div>
 
                 <div class="control-section">
@@ -440,7 +478,7 @@
                     <div class="section-label">Forme</div>
                     <div class="control-group">
                         <label>Épaisseur <span class="control-value" id="tslider_val">10</span></label>
-                        <input type="range" id="tslider" min="5" max="30" value="10">
+                        <input type="range" id="tslider" min="5" max="50" value="10">
                     </div>
                     <div class="control-group">
                         <label>Chaos <span class="control-value" id="wslider_val">3</span></label>
@@ -463,6 +501,7 @@
             
             <div class="actions">
                 <button class="primary-btn" id="genbtn">Générer Variations</button>
+                <button class="secondary-btn" id="exportGifBtn" style="margin-top: 10px;">📹 Exporter GIF (2s)</button>
                 <div class="info-text">Clic sur une case pour exporter en SVG</div>
             </div>
         </div>
