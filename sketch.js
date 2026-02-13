@@ -40,8 +40,9 @@ function setup() {
     setupInterface();
     setupThemeToggle();
     setupLogoUpload();
+    setupLineTabs();
     setupGifExport();
-    updateLineDisplay();
+    updateLineTabs();
 }
 
 function calculateCanvasSize() {
@@ -69,7 +70,6 @@ function windowResized() {
 
 function initializeLines() {
     lines = [];
-    // Créer 4 lignes au démarrage
     for (let i = 0; i < 4; i++) {
         lines.push(createNewLine());
     }
@@ -123,15 +123,31 @@ function setupLogoUpload() {
     };
 }
 
-function updateLineDisplay() {
-    const line = lines[activeLine];
+function setupLineTabs() {
+    const tabs = document.querySelectorAll('.line-tab');
+    tabs.forEach((tab, idx) => {
+        tab.onclick = () => {
+            activeLine = idx;
+            updateLineTabs();
+            loadLineSettings();
+        };
+    });
+}
+
+function updateLineTabs() {
+    // Mettre à jour les couleurs des dots
+    for (let i = 0; i < 4; i++) {
+        const dot = document.getElementById(`dot${i}`);
+        if (dot) {
+            dot.style.backgroundColor = lines[i].color;
+        }
+    }
     
-    // Mettre à jour le titre et la couleur
-    document.getElementById('lineSettingsTitle').textContent = `Ligne ${activeLine + 1}`;
-    document.getElementById('lineColorDot').style.backgroundColor = line.color;
-    
-    // Charger les valeurs
-    loadLineSettings();
+    // Mettre à jour l'onglet actif
+    const tabs = document.querySelectorAll('.line-tab');
+    tabs.forEach((tab, idx) => {
+        tab.classList.toggle('active', idx === activeLine);
+    });
 }
 
 function loadLineSettings() {
@@ -203,4 +219,218 @@ function setupInterface() {
         let slider = document.getElementById(s.id);
         if(slider) {
             slider.oninput = (e) => {
-                s.actio
+                s.action(e.target.value);
+                document.getElementById(s.id + '_val').textContent = e.target.value;
+            };
+        }
+    });
+
+    document.getElementById('genbtn').onclick = () => {
+        initializeLines();
+        updateLineTabs();
+        loadLineSettings();
+    };
+    
+    document.getElementById('animCheck').onchange = (e) => {
+        isAnimating = e.target.checked;
+    };
+    
+    document.getElementById('lineInFrontToggle').onchange = (e) => {
+        lines[activeLine].inFront = e.target.checked;
+    };
+}
+
+function regenerateLine(lineIndex) {
+    lines[lineIndex].color = random(palette);
+    lines[lineIndex].offset = random(1000);
+    lines[lineIndex].speed = random(0.02, 0.05) * (random() > 0.5 ? 1 : -1);
+    updateLineTabs();
+}
+
+function draw() {
+    background(255);
+    let t = isAnimating ? (frameCount * 0.02) : 0;
+
+    for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+            let x = i * cellW;
+            let y = j * cellH;
+            let cellIndex = i + j * cols;
+            
+            if (cellIndex === selectedCell) {
+                stroke('#007aff');
+                strokeWeight(3);
+            } else {
+                stroke(240);
+                strokeWeight(1);
+            }
+            noFill();
+            rect(x, y, cellW, cellH);
+            
+            let currentCellLines = cellLines[cellIndex];
+            
+            currentCellLines.forEach(lineIdx => {
+                if (!lines[lineIdx].inFront) {
+                    let pg = createGraphics(cellW, cellH);
+                    drawLine(pg, cellW, cellH, lines[lineIdx], t);
+                    image(pg, x, y);
+                    pg.remove();
+                }
+            });
+            
+            if (logoImg) {
+                let ratio = (logoImg.width > 1) ? logoImg.width / logoImg.height : 4.45;
+                let wDraw = cellW * 0.4 * logoScale;
+                let hDraw = wDraw / ratio;
+                image(logoImg, x + (cellW - wDraw)/2, y + (cellH * 0.2), wDraw, hDraw);
+            }
+            
+            currentCellLines.forEach(lineIdx => {
+                if (lines[lineIdx].inFront) {
+                    let pg = createGraphics(cellW, cellH);
+                    drawLine(pg, cellW, cellH, lines[lineIdx], t);
+                    image(pg, x, y);
+                    pg.remove();
+                }
+            });
+        }
+    }
+    
+    if (isRecording && capturer) {
+        if (recordingFrames < maxRecordingFrames) {
+            let tempCanvas = createGraphics(cellW, cellH);
+            let col = recordingCell % cols;
+            let row = floor(recordingCell / cols);
+            tempCanvas.image(get(col * cellW, row * cellH, cellW, cellH), 0, 0);
+            capturer.capture(tempCanvas.canvas);
+            tempCanvas.remove();
+            recordingFrames++;
+        } else {
+            capturer.stop();
+            capturer.save();
+            
+            if (recordingCell < 3) {
+                setTimeout(() => startCellRecording(recordingCell + 1), 500);
+            } else {
+                isRecording = false;
+                const btn = document.getElementById('exportGifBtn');
+                btn.disabled = false;
+                btn.textContent = "Exporter 4 GIF";
+                alert("✅ 4 GIF exportés !");
+            }
+        }
+    }
+}
+
+function drawLine(pg, w, h, line, time) {
+    pg.clear(); 
+    pg.noFill(); 
+    pg.stroke(line.color); 
+    pg.strokeCap(ROUND); 
+    pg.strokeJoin(ROUND);
+    
+    let startX = w * 0.15, endX = w * 0.85;
+    let adjustedEndX = startX + (endX - startX) * line.length;
+    
+    pg.beginShape();
+    for (let i = startX; i <= adjustedEndX; i += 3) {
+        let n = i/w;
+        let movingOffset = line.offset + (time * line.speed * 50); 
+        let wave = (sin(n * line.freq * TWO_PI + movingOffset) * 0.6 + 
+                    sin(n * line.freq * 0.5 * TWO_PI + movingOffset * 1.5) * 0.4);
+        let y = h/2.5 + wave * 60;
+        let th = map(Math.sin((i-startX)/(endX-startX)*Math.PI), 0, 1, 0.6, 1) * line.thickness;
+        pg.strokeWeight(th);
+        pg.curveVertex(i + line.hOffset, y + line.vOffset + h*0.3);
+    }
+    pg.endShape();
+}
+
+function handleCanvasClick() {
+    let col = floor(mouseX / cellW);
+    let row = floor(mouseY / cellH);
+    
+    if (col >= 0 && col < cols && row >= 0 && row < rows) {
+        let cellIndex = col + row * cols;
+        
+        selectedCell = cellIndex;
+        
+        cellLines[cellIndex] = [];
+        for (let i = 0; i <= cellIndex; i++) {
+            cellLines[cellIndex].push(i);
+        }
+        
+        activeLine = cellIndex;
+        updateLineTabs();
+        loadLineSettings();
+        
+        if (event.detail === 2) {
+            exportCellAsSVG(cellIndex);
+        }
+    }
+}
+
+function exportCellAsSVG(cellIndex) {
+    let col = cellIndex % cols;
+    let row = floor(cellIndex / cols);
+    let currentCellLines = cellLines[cellIndex];
+    
+    let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${cellW}" height="${cellH}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <rect x="0" y="0" width="${cellW}" height="${cellH}" fill="white"/>
+`;
+
+    currentCellLines.forEach(lineIdx => {
+        if (!lines[lineIdx].inFront) {
+            svgContent += generateLineSVG(cellW, cellH, lines[lineIdx]);
+        }
+    });
+    
+    if (logoImg && logoImg.canvas && logoImg.canvas.toDataURL) {
+        let ratio = (logoImg.width > 1) ? logoImg.width / logoImg.height : 4.45;
+        let wDraw = cellW * 0.4 * logoScale;
+        let hDraw = wDraw / ratio;
+        let imgX = (cellW - wDraw)/2;
+        let imgY = cellH * 0.2;
+        svgContent += `  <image x="${imgX}" y="${imgY}" width="${wDraw}" height="${hDraw}" xlink:href="${logoImg.canvas.toDataURL()}"/>\n`;
+    }
+    
+    currentCellLines.forEach(lineIdx => {
+        if (lines[lineIdx].inFront) {
+            svgContent += generateLineSVG(cellW, cellH, lines[lineIdx]);
+        }
+    });
+    
+    svgContent += `</svg>`;
+    
+    downloadSVG(svgContent, `case-${cellIndex + 1}.svg`);
+}
+
+function generateLineSVG(w, h, line) {
+    let startX = w * 0.15, endX = w * 0.85;
+    let adjustedEndX = startX + (endX - startX) * line.length;
+    let points = [];
+    
+    for (let i = startX; i <= adjustedEndX; i += 3) {
+        let n = i/w;
+        let wave = (Math.sin(n * line.freq * TWO_PI + line.offset) * 0.6 + 
+                    Math.sin(n * line.freq * 0.5 * TWO_PI + line.offset * 1.5) * 0.4);
+        let y = h/2.5 + wave * 60 + line.vOffset + h*0.3;
+        points.push(`${i + line.hOffset},${y}`);
+    }
+    
+    let pathData = `M ${points.join(' L ')}`;
+    return `  <path d="${pathData}" stroke="${line.color}" fill="none" stroke-width="${line.thickness}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+}
+
+function downloadSVG(content, filename) {
+    let blob = new Blob([content], {type: 'image/svg+xml'});
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
