@@ -1,337 +1,548 @@
-let seeds = [];
-let cols = 2, rows = 2, cellW, cellH;
-let palette = ["#D4B483", "#48A9A6", "#E88D67"];
-let thickness = 10, verticalOffset = 0, horizontalOffset = 0, logoImg = null;
-let waveFrequency = 3, lineLength = 1, logoScale = 1;
-let isAnimating = false;
-let canvasWidth, canvasHeight;
-let extraLinesCount = 0;
-let linesInFront = false;
-let capturer = null;
-let isRecording = false;
-let recordingFrames = 0;
-let maxRecordingFrames = 120; // 2 secondes à 60fps
-
-function setup() {
-    calculateCanvasSize();
-    let cnv = createCanvas(canvasWidth, canvasHeight);
-    cnv.parent('canvas-container');
-    cnv.mousePressed(handleCanvasClick);
-    frameRate(60);
-    
-    loadImage('logo.svg', (img) => { logoImg = img; }, () => { console.log("Logo absent"); });
-
-    cellW = width / cols;
-    cellH = height / rows;
-    
-    setupInterface();
-    setupThemeToggle();
-    setupLogoUpload();
-    setupExtraLines();
-    setupGifExport();
-    regenerate();
-}
-
-function calculateCanvasSize() {
-    let container = document.getElementById('canvas-container');
-    let maxWidth = container.clientWidth - 40;
-    let maxHeight = window.innerHeight - 100;
-    
-    let ratio = 5 / 4;
-    
-    if (window.innerWidth < 768) {
-        canvasWidth = Math.min(maxWidth, 600);
-        canvasHeight = canvasWidth / ratio;
-    } else {
-        canvasWidth = Math.min(maxWidth, 1000);
-        canvasHeight = canvasWidth / ratio;
-    }
-}
-
-function windowResized() {
-    calculateCanvasSize();
-    resizeCanvas(canvasWidth, canvasHeight);
-    cellW = width / cols;
-    cellH = height / rows;
-}
-
-function setupThemeToggle() {
-    const toggle = document.getElementById('themeToggle');
-    const icon = document.getElementById('themeIcon');
-    const html = document.documentElement;
-    
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    html.setAttribute('data-theme', savedTheme);
-    icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-    
-    toggle.onclick = () => {
-        const currentTheme = html.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        html.setAttribute('data-theme', newTheme);
-        icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        localStorage.setItem('theme', newTheme);
-    };
-}
-
-function setupLogoUpload() {
-    const upload = document.getElementById('logoUpload');
-    upload.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                loadImage(event.target.result, (img) => {
-                    logoImg = img;
-                    console.log("Nouveau logo chargé");
-                });
-            };
-            reader.readAsDataURL(file);
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Variations</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
         }
-    };
-}
-
-function setupExtraLines() {
-    const slider = document.getElementById('extraLinesSlider');
-    const val = document.getElementById('extraLinesSlider_val');
-    const toggle = document.getElementById('linesPositionToggle');
-    
-    if (slider) {
-        slider.oninput = (e) => {
-            extraLinesCount = parseInt(e.target.value);
-            val.textContent = extraLinesCount;
-            regenerate();
-        };
-    }
-    
-    if (toggle) {
-        toggle.onchange = (e) => {
-            linesInFront = e.target.checked;
-        };
-    }
-}
-
-function setupGifExport() {
-    const btn = document.getElementById('exportGifBtn');
-    if (btn) {
-        btn.onclick = startGifRecording;
-    }
-}
-
-function startGifRecording() {
-    if (!isAnimating) {
-        alert("⚠️ Active l'animation avant d'exporter un GIF !");
-        return;
-    }
-    
-    const btn = document.getElementById('exportGifBtn');
-    btn.disabled = true;
-    btn.textContent = "🎬 Enregistrement...";
-    
-    capturer = new CCapture({
-        format: 'gif',
-        workersPath: 'https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/src/',
-        framerate: 60,
-        quality: 90,
-        name: 'logo-animation'
-    });
-    
-    isRecording = true;
-    recordingFrames = 0;
-    capturer.start();
-}
-
-function setupInterface() {
-    const sliders = [
-        {id: 'vslider', action: (v) => verticalOffset = parseInt(v)},
-        {id: 'hslider', action: (v) => horizontalOffset = parseInt(v)},
-        {id: 'tslider', action: (v) => thickness = parseInt(v)},
-        {id: 'wslider', action: (v) => { waveFrequency = parseFloat(v); regenerate(); }},
-        {id: 'lslider', action: (v) => lineLength = parseFloat(v)},
-        {id: 'logoslider', action: (v) => logoScale = parseFloat(v)}
-    ];
-
-    sliders.forEach(s => {
-        let slider = document.getElementById(s.id);
-        if(slider) {
-            slider.oninput = (e) => {
-                s.action(e.target.value);
-                document.getElementById(s.id + '_val').textContent = e.target.value;
-            };
-        }
-    });
-
-    document.getElementById('genbtn').onclick = regenerate;
-    document.getElementById('animCheck').onchange = (e) => {
-        isAnimating = e.target.checked;
-    };
-}
-
-function regenerate() {
-    seeds = [];
-    let totalLines = 1 + extraLinesCount;
-    
-    for (let i = 0; i < cols * rows; i++) {
-        let cellSeeds = [];
-        for (let j = 0; j < totalLines; j++) {
-            cellSeeds.push({
-                color: random(palette),
-                freq: waveFrequency,
-                offset: random(1000),
-                dist: random(0.8, 1.2),
-                amp: random(40, 90),
-                speed: random(0.02, 0.05) * (random() > 0.5 ? 1 : -1)
-            });
-        }
-        seeds.push(cellSeeds);
-    }
-}
-
-function draw() {
-    background(255);
-    let t = isAnimating ? (frameCount * 0.02) : 0;
-
-    for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) {
-            let x = i * cellW;
-            let y = j * cellH;
-            let idx = i + j * cols;
-            
-            stroke(245); strokeWeight(1); noFill();
-            rect(x, y, cellW, cellH);
-            
-            if (!linesInFront && seeds[idx]) {
-                let pg = createGraphics(cellW, cellH);
-                seeds[idx].forEach(s => drawLine(pg, cellW, cellH, s, t));
-                image(pg, x, y);
-                pg.remove();
-            }
-            
-            if (logoImg) {
-                let ratio = (logoImg.width > 1) ? logoImg.width / logoImg.height : 4.45;
-                let wDraw = cellW * 0.4 * logoScale;
-                let hDraw = wDraw / ratio;
-                image(logoImg, x + (cellW - wDraw)/2, y + (cellH * 0.2), wDraw, hDraw);
-            }
-            
-            if (linesInFront && seeds[idx]) {
-                let pg = createGraphics(cellW, cellH);
-                seeds[idx].forEach(s => drawLine(pg, cellW, cellH, s, t));
-                image(pg, x, y);
-                pg.remove();
-            }
-        }
-    }
-    
-    if (isRecording && capturer) {
-        capturer.capture(document.querySelector('#canvas-container canvas'));
-        recordingFrames++;
         
-        if (recordingFrames >= maxRecordingFrames) {
-            stopGifRecording();
+        :root {
+            --bg-main: #f5f5f7;
+            --bg-canvas: #e8e8ed;
+            --bg-panel: #ffffff;
+            --bg-section: #f9f9f9;
+            --border-color: #d2d2d7;
+            --border-light: #e5e5e5;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --accent: #000000;
+            --accent-hover: #424245;
+            --slider-track: #d1d1d6;
+            --slider-thumb: #000000;
+            --selection-border: #007aff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
         }
-    }
-}
+        
+        [data-theme="dark"] {
+            --bg-main: #000000;
+            --bg-canvas: #1c1c1e;
+            --bg-panel: #1c1c1e;
+            --bg-section: #2c2c2e;
+            --border-color: #38383a;
+            --border-light: #2c2c2e;
+            --text-primary: #f5f5f7;
+            --text-secondary: #98989d;
+            --text-tertiary: #636366;
+            --accent: #ffffff;
+            --accent-hover: #d1d1d6;
+            --slider-track: #48484a;
+            --slider-thumb: #ffffff;
+            --selection-border: #0a84ff;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-primary); 
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            transition: background 0.2s ease;
+        }
+        
+        .container { 
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        /* ZONE CANVAS */
+        .canvas-wrapper { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: var(--bg-canvas);
+            padding: 24px;
+            flex: 1;
+            min-height: 500px;
+        }
+        
+        #canvas-container {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        #canvas-container canvas { 
+            box-shadow: var(--shadow-md);
+            background: white;
+            max-width: 100%; 
+            height: auto !important;
+            border-radius: 0;
+            cursor: pointer;
+        }
+        
+        /* PANNEAU LATÉRAL */
+        .panel { 
+            background: var(--bg-panel); 
+            border-top: 1px solid var(--border-color);
+            display: flex; 
+            flex-direction: column;
+            max-height: 65vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .panel-header { 
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            background: var(--bg-panel);
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-title-group {
+            flex: 1;
+        }
+        
+        .panel-title {
+            font-size: 17px; 
+            font-weight: 600;
+            letter-spacing: -0.022em;
+            margin-bottom: 2px;
+            color: var(--text-primary);
+        }
+        
+        .panel-subtitle {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-weight: 400;
+            letter-spacing: -0.01em;
+        }
+        
+        /* THEME TOGGLE */
+        .theme-toggle {
+            background: transparent;
+            border: none;
+            padding: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: opacity 0.2s ease;
+            opacity: 0.6;
+        }
+        
+        .theme-toggle:hover {
+            opacity: 1;
+        }
+        
+        /* CONTRÔLES */
+        .controls-wrapper {
+            padding: 20px;
+            flex-grow: 1;
+        }
+        
+        /* LINE SELECTOR */
+        .line-selector-wrapper {
+            margin-bottom: 24px;
+        }
+        
+        .line-selector {
+            display: flex;
+            gap: 0;
+            background: var(--bg-section);
+            border-radius: 9px;
+            padding: 2px;
+            border: 1px solid var(--border-light);
+        }
+        
+        .line-selector button {
+            flex: 1;
+            padding: 8px 12px;
+            background: transparent;
+            border: none;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: -0.01em;
+        }
+        
+        .line-selector button.active {
+            background: white;
+            color: var(--text-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        [data-theme="dark"] .line-selector button.active {
+            background: var(--border-color);
+        }
+        
+        .line-selector button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .control-section {
+            margin-bottom: 24px;
+        }
+        
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-tertiary);
+            margin-bottom: 12px;
+        }
+        
+        .control-group { 
+            margin-bottom: 16px;
+        }
+        
+        .control-group label { 
+            font-size: 13px; 
+            font-weight: 500;
+            color: var(--text-secondary);
+            display: flex; 
+            justify-content: space-between;
+            margin-bottom: 10px;
+            align-items: baseline;
+            letter-spacing: -0.01em;
+        }
+        
+        .control-value {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+            font-size: 13px;
+        }
+        
+        input[type="range"] { 
+            width: 100%; 
+            cursor: pointer;
+            height: 3px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--slider-track);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--slider-thumb);
+            cursor: pointer;
+            transition: transform 0.15s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(0.95);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--slider-thumb);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        
+        /* CHECKBOX */
+        .checkbox-group { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            padding: 12px 14px;
+            background: var(--bg-section);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-light);
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        
+        .checkbox-group label {
+            font-size: 13px; 
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            letter-spacing: -0.01em;
+        }
+        
+        /* UPLOAD LOGO */
+        .upload-section {
+            margin-bottom: 20px;
+        }
+        
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .upload-btn {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-section);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+            letter-spacing: -0.01em;
+        }
+        
+        .upload-btn:hover {
+            background: var(--slider-track);
+        }
+        
+        .upload-btn-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* ACTIONS */
+        .actions { 
+            padding: 20px;
+            border-top: 1px solid var(--border-light);
+            background: var(--bg-panel);
+        }
+        
+        button.primary-btn { 
+            width: 100%;
+            padding: 13px; 
+            border: none; 
+            border-radius: 8px; 
+            font-weight: 600;
+            cursor: pointer; 
+            font-size: 13px;
+            letter-spacing: -0.01em;
+            transition: all 0.2s ease;
+            background: var(--accent); 
+            color: white;
+        }
+        
+        [data-theme="dark"] button.primary-btn {
+            color: var(--bg-main);
+        }
+        
+        button.primary-btn:hover { 
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+        
+        button.primary-btn:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary-btn {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            letter-spacing: -0.01em;
+            transition: all 0.2s ease;
+            background: transparent;
+            color: var(--text-primary);
+            margin-top: 8px;
+        }
 
-function stopGifRecording() {
-    isRecording = false;
-    capturer.stop();
-    capturer.save();
-    
-    const btn = document.getElementById('exportGifBtn');
-    btn.disabled = false;
-    btn.textContent = "📹 Exporter GIF (2s)";
-    
-    recordingFrames = 0;
-    capturer = null;
-}
+        button.secondary-btn:hover {
+            background: var(--bg-section);
+        }
 
-function drawLine(pg, w, h, s, time) {
-    pg.clear(); pg.noFill(); pg.stroke(s.color); pg.strokeCap(ROUND); pg.strokeJoin(ROUND);
-    let startX = w * 0.15, endX = w * 0.85;
-    let adjustedEndX = startX + (endX - startX) * lineLength;
-    pg.beginShape();
-    for (let i = startX; i <= adjustedEndX; i += 3) {
-        let n = i/w;
-        let movingOffset = s.offset + (time * s.speed * 50); 
-        let wave = (sin(n * s.freq * TWO_PI + movingOffset) * 0.6 + sin(n * s.freq * 0.5 * TWO_PI + movingOffset * 1.5) * 0.4);
-        let y = h/2.5 + wave * s.amp;
-        let th = map(Math.sin((i-startX)/(endX-startX)*Math.PI), 0, 1, 0.6, 1) * thickness;
-        pg.strokeWeight(th);
-        pg.curveVertex(i + horizontalOffset, y + verticalOffset + h*0.3);
-    }
-    pg.endShape();
-}
+        button.secondary-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .info-text { 
+            font-size: 11px; 
+            color: var(--text-tertiary); 
+            text-align: center; 
+            margin-top: 12px;
+            letter-spacing: -0.01em;
+        }
+        
+        /* RESPONSIVE */
+        @media (min-width: 768px) {
+            .container {
+                display: grid;
+                grid-template-columns: 1fr 360px;
+                flex-direction: row;
+            }
+            
+            .canvas-wrapper {
+                padding: 48px;
+                min-height: 100vh;
+            }
+            
+            .panel {
+                border-top: none;
+                border-left: 1px solid var(--border-color);
+                max-height: 100vh;
+            }
+            
+            .panel-header {
+                padding: 28px 24px 20px;
+            }
+            
+            .panel-title {
+                font-size: 19px;
+            }
+            
+            .panel-subtitle {
+                font-size: 13px;
+            }
+            
+            .controls-wrapper {
+                padding: 24px;
+            }
+            
+            .control-section {
+                margin-bottom: 28px;
+            }
+            
+            .actions {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-wrapper" id="canvas-container"></div>
+        
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title-group">
+                    <div class="panel-title">Générateur de Variations</div>
+                    <div class="panel-subtitle">Superposez vos lignes</div>
+                </div>
+                <button class="theme-toggle" id="themeToggle" aria-label="Changer le thème">
+                    <span id="themeIcon">🌙</span>
+                </button>
+            </div>
+            
+            <div class="controls-wrapper">
+                <div class="upload-section">
+                    <div class="section-label">Logo</div>
+                    <div class="upload-btn-wrapper">
+                        <div class="upload-btn">Charger un logo</div>
+                        <input type="file" id="logoUpload" accept=".svg,.png,.jpg,.jpeg">
+                    </div>
+                </div>
+                
+                <div class="line-selector-wrapper">
+                    <div class="section-label">Ligne active</div>
+                    <div class="line-selector" id="lineSelector">
+                        <button data-line="0">Ligne 1</button>
+                        <button data-line="1">Ligne 2</button>
+                        <button data-line="2">Ligne 3</button>
+                        <button data-line="3">Ligne 4</button>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="animCheck">
+                    <label for="animCheck">Animation</label>
+                </div>
 
-function handleCanvasClick() {
-    let col = floor(mouseX / cellW);
-    let row = floor(mouseY / cellH);
-    
-    if (col >= 0 && col < cols && row >= 0 && row < rows) {
-        let idx = col + row * cols;
-        exportCellAsSVG(col, row, idx);
-    }
-}
+                <div class="control-section">
+                    <div class="section-label">Position</div>
+                    <div class="control-group">
+                        <label>Verticale <span class="control-value" id="vslider_val">0</span></label>
+                        <input type="range" id="vslider" min="-80" max="80" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label>Horizontale <span class="control-value" id="hslider_val">0</span></label>
+                        <input type="range" id="hslider" min="-150" max="150" value="0">
+                    </div>
+                </div>
 
-function exportCellAsSVG(col, row, idx) {
-    let x = col * cellW;
-    let y = row * cellH;
-    
-    let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${cellW}" height="${cellH}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <rect x="0" y="0" width="${cellW}" height="${cellH}" fill="white"/>
-`;
+                <div class="control-section">
+                    <div class="section-label">Forme</div>
+                    <div class="control-group">
+                        <label>Épaisseur <span class="control-value" id="tslider_val">10</span></label>
+                        <input type="range" id="tslider" min="5" max="50" value="10">
+                    </div>
+                    <div class="control-group">
+                        <label>Chaos <span class="control-value" id="wslider_val">3</span></label>
+                        <input type="range" id="wslider" min="1" max="8" step="0.5" value="3">
+                    </div>
+                    <div class="control-group">
+                        <label>Longueur <span class="control-value" id="lslider_val">1</span></label>
+                        <input type="range" id="lslider" min="0.2" max="1" step="0.1" value="1">
+                    </div>
+                </div>
 
-    if (!linesInFront && seeds[idx]) {
-        seeds[idx].forEach(s => {
-            svgContent += generateLineSVG(cellW, cellH, s, 0);
-        });
-    }
-    
-    if (logoImg && logoImg.canvas && logoImg.canvas.toDataURL) {
-        let ratio = (logoImg.width > 1) ? logoImg.width / logoImg.height : 4.45;
-        let wDraw = cellW * 0.4 * logoScale;
-        let hDraw = wDraw / ratio;
-        let imgX = (cellW - wDraw)/2;
-        let imgY = cellH * 0.2;
-        svgContent += `  <image x="${imgX}" y="${imgY}" width="${wDraw}" height="${hDraw}" xlink:href="${logoImg.canvas.toDataURL()}"/>\n`;
-    }
-    
-    if (linesInFront && seeds[idx]) {
-        seeds[idx].forEach(s => {
-            svgContent += generateLineSVG(cellW, cellH, s, 0);
-        });
-    }
-    
-    svgContent += `</svg>`;
-    
-    downloadSVG(svgContent, `variation_${col}_${row}.svg`);
-}
-
-function generateLineSVG(w, h, s, time) {
-    let startX = w * 0.15, endX = w * 0.85;
-    let adjustedEndX = startX + (endX - startX) * lineLength;
-    let points = [];
-    
-    for (let i = startX; i <= adjustedEndX; i += 3) {
-        let n = i/w;
-        let movingOffset = s.offset + (time * s.speed * 50);
-        let wave = (Math.sin(n * s.freq * TWO_PI + movingOffset) * 0.6 + Math.sin(n * s.freq * 0.5 * TWO_PI + movingOffset * 1.5) * 0.4);
-        let y = h/2.5 + wave * s.amp + verticalOffset + h*0.3;
-        points.push(`${i + horizontalOffset},${y}`);
-    }
-    
-    let pathData = `M ${points.join(' L ')}`;
-    return `  <path d="${pathData}" stroke="${s.color}" fill="none" stroke-width="${thickness}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
-}
-
-function downloadSVG(content, filename) {
-    let blob = new Blob([content], {type: 'image/svg+xml'});
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
+                <div class="control-section">
+                    <div class="section-label">Logo</div>
+                    <div class="control-group">
+                        <label>Échelle <span class="control-value" id="logoslider_val">1</span></label>
+                        <input type="range" id="logoslider" min="0.5" max="2" step="0.1" value="1">
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="lineInFrontToggle">
+                        <label for="lineInFrontToggle">Ligne devant le logo</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="primary-btn" id="genbtn">Générer Variations</button>
+                <button class="secondary-btn" id="exportGifBtn">Exporter 4 GIF</button>
+                <div class="info-text">Clic sur une case pour exporter le SVG</div>
+            </div>
+        </div>
+    </div>
+    <script src="sketch.js"></script>
+</body>
+</html>
